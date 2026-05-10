@@ -1,0 +1,12 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Environment and local config
+.env
+
+# OS and editor local files
+.DS_Store
+.vscode/
+
+*.pdf
