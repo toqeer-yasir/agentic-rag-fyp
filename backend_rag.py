@@ -192,7 +192,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Agentic Chatbot API", lifespan=lifespan)
 
-app.add_middleware(
+app.add_middleware( # frontend runs on different port like 3000 and backend on 8000 so browser stops that behaviout to avoide it we use it(middleware).
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
@@ -217,7 +217,7 @@ class ConversationMessage(BaseModel):
 def calculator_tool(expression: str) -> str:
     """Evaluate mathematical expressions."""
     try:
-        allowed_names = {**math.__dict__}
+        allowed_names = {**math.__dict__} # it allows math functions like sqrt, pi, sin, cos etc...
         result = eval(expression, {"__builtins__": {}}, allowed_names)
         return str(result)
     except Exception as e:
