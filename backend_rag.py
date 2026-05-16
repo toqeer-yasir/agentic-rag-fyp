@@ -60,26 +60,26 @@ class FastRAG:
         if metadatas:
             self.metadata.extend(metadatas)
         else:
-            self.metadata.extend([{}] * len(texts))
+            self.metadata.extend([{}] * len(texts)) # this stores empty matadata objects like [{}, {}, {}], each dict per chunk.
         
         # Compute embeddings
-        new_embeddings = self.model.encode(texts, convert_to_numpy=True)
+        new_embeddings = self.model.encode(texts, convert_to_numpy=True) # it converts to numpy for faster usage, after encoding.
         
         if self.embeddings is None:
             self.embeddings = new_embeddings
         else:
-            self.embeddings = np.vstack([self.embeddings, new_embeddings])
+            self.embeddings = np.vstack([self.embeddings, new_embeddings]) # this extends list of embeddings if already exists some like [[0.34], [0.43] ...].
     
     def similarity_search(self, query: str, k: int = 4) -> List[Dict]:
         """Search for similar documents"""
         if not self.documents:
             return []
         
-        query_embedding = self.model.encode([query], convert_to_numpy=True)
+        query_embedding = self.model.encode([query], convert_to_numpy=True) # here we are alos converting user query to embadings.
         
         # Compute cosine similarity
         similarities = np.dot(self.embeddings, query_embedding.T).flatten()
-        similarities = similarities / (np.linalg.norm(self.embeddings, axis=1) * np.linalg.norm(query_embedding))
+        similarities = similarities / (np.linalg.norm(self.embeddings, axis=1) * np.linalg.norm(query_embedding)) # this converts raw dot product into proper cosine similarity, without normalization longer vectors could unfairly dominate.
         
         # Get top k
         top_k_idx = np.argsort(similarities)[-k:][::-1]
@@ -131,7 +131,7 @@ async def ingest_file(file_bytes: bytes, filename: str, thread_id: str) -> Dict:
         docs = loader.load()
         
         # Split documents
-        splitter = RecursiveCharacterTextSplitter(
+        splitter = RecursiveCharacterTextSplitter( # LLM can't handel large text so we split them into chunks.
             chunk_size=1000,
             chunk_overlap=200,
             separators=["\n\n", "\n", " ", ""]
