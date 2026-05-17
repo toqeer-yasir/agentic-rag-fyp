@@ -457,7 +457,7 @@ async def websocket_chat(websocket: WebSocket):
                             elif 'retriever' in tool_name:
                                 tools_used.append('Doc Retriever')
                             else:
-                                tools_used.append(tool.replace('_', ' ').title())
+                                tools_used.append(tool_name.replace('_', ' ').title())
                         
                         await websocket.send_json({
                             "type": "tool_call",
