@@ -10,3 +10,6 @@ __pycache__/
 .vscode/
 
 *.pdf
+
+*.db-shm
+*.db-wal
