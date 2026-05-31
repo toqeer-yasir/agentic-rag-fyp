@@ -8,6 +8,10 @@ import tempfile
 import numpy as np
 from pathlib import Path
 
+#for title generation
+from title_generator import predict_chat_title
+import random
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -172,15 +176,20 @@ async def ingest_file(file_bytes: bytes, filename: str, thread_id: str) -> Dict:
 chatbot = None
 CHECKPOINTER = None
 client = None
+title_generator = None
 
 # ==================== Lifespan ====================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifecycle"""
-    global chatbot, CHECKPOINTER, client
+    global chatbot, CHECKPOINTER, client, title_generator
     
     print("Initializing chatbot...")
+
     chatbot, CHECKPOINTER, client = await initialize_chatbot()
+    
+    title_generator = predict_chat_title
+    
     print("Chatbot initialized successfully!")
     
     yield
@@ -212,6 +221,49 @@ class ConversationMessage(BaseModel):
     role: str
     content: str
 
+
+# ===================== herper finctions for title generation=========
+def build_title_transcript(messages):
+    """
+    transcript using first user and first assistant message.
+    """
+
+    user_message = None
+    assistant_message = None
+
+    for msg in messages:
+
+        if isinstance(msg, HumanMessage) and user_message is None:
+            user_message = msg.content
+
+        elif (
+            isinstance(msg, AIMessage) and assistant_message is None and msg.content):
+            assistant_message = msg.content
+
+        if user_message and assistant_message:
+            break
+
+    transcript = f"user: {user_message}\nassistant: {assistant_message}"
+
+    transcript += f"\nassistant: {assistant_message}"
+    return transcript
+
+def format_title(title):
+    words = title.split()
+    title = " ".join(words[:4])
+    if len(words) > 4:
+        title += "..."
+    return title
+
+
+def smart_title(messages):
+    chosen_class = random.choice([HumanMessage, AIMessage])
+    for msg in messages:
+        if isinstance(msg, chosen_class) and msg.content:
+            return format_title(msg.content)
+
+    return format_title(messages[0].content) if messages else "Empty chat"
+  
 # ==================== Tools ====================
 @tool()
 def calculator_tool(expression: str) -> str:
@@ -516,32 +568,45 @@ async def get_conversation(thread_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/conversation/{thread_id}/title")
 async def get_conversation_title(thread_id: str):
-    """Get the title of a conversation based on first message"""
+
     try:
-        state = await chatbot.aget_state(config={'configurable': {'thread_id': thread_id}})
-        messages = state.values.get('messages', [])
-        
-        for msg in messages:
-            if isinstance(msg, HumanMessage) and msg.content:
-                words = msg.content.split()[:4]
-                title = ' '.join(words)
-                if len(msg.content.split()) > 4:
-                    title += '...'
-                return {"title": title if title else "Empty message"}
-        
-        return {"title": "Empty chat"}
-    except Exception as e:
+
+        state = await chatbot.aget_state(config={"configurable": {"thread_id": thread_id}})
+        messages = state.values.get("messages", [])
+
+        if not messages:
+            return {"title": "Empty chat"}
+
+        transcript = build_title_transcript(messages)
+
+        if not transcript:
+            return {"title": smart_title(messages)}
+
+        try:
+
+            title = await asyncio.wait_for(asyncio.to_thread(title_generator,transcript),timeout=0.05)
+            if title and title.strip():
+                print("title generated with llm.")
+                return {"title": title.strip()}
+
+        except Exception as e:
+
+            print(
+                f"Title generation error: {e}"
+            )
+
+        print("title generated with smart methode.")
+        return {
+            "title": smart_title(messages)
+        }
+
+    except Exception:
+
         return {"title": "Empty chat"}
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "chatbot_initialized": chatbot is not None
-    }
 
 if __name__ == "__main__":
     import uvicorn
