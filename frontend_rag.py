@@ -53,7 +53,7 @@ def fetch_conversation_title(thread_id: str) -> str:
         response.raise_for_status()
         return response.json()["title"]
     except Exception:
-        return "Empty chat"
+        return "Title Generation Issue!"
 
 def load_conversation(thread_id: str) -> List[Dict]:
     """Load conversation history from the API."""
